@@ -1,0 +1,5 @@
+*.zcos
+*.xml
+*.bin
+
+.idea/
