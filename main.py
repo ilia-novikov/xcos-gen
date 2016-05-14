@@ -6,6 +6,13 @@ import xml.etree.ElementTree as ET
 
 import shutil
 
+import subprocess
+
+from block import Block
+
+scilab_path = '/home/ilia/scilab-5.5.2/'
+java = '/usr/lib/jvm/jdk1.8.0_72/bin/java'
+
 formatter = logging.Formatter(
     fmt='xcos-gen :: %(levelname)s @ [%(asctime)s] %(message)s',
     datefmt='%d-%m-%Y / %H:%M:%S'
@@ -53,7 +60,26 @@ blocks = []
 for item in model.iter('BasicBlock'):
     block_type = item.attrib['interfaceFunctionName']
     block_id = item.attrib['id']
-    logger.info("Тип блока: {0}, ID блока: {1}".format(block_type, block_id))
     if block_type not in known_blocks:
         logger.error("Неивестный тип блока: {0}".format(block_type))
         exit(1)
+    block = Block(block_type, block_id)
+    if block_type == 'GAIN_f':
+        for child in item.iter('ScilabDouble'):
+            if child.attrib['as'] == 'realParameters':
+                command = '{0} -classpath {1}:{2} Extractor {3} {4}'.format(
+                    java,
+                    os.path.dirname(__file__),
+                    scilab_path + 'share/scilab/modules/types/jar/org.scilab.modules.types.jar',
+                    os.path.dirname(__file__) + '/data.bin',
+                    child.attrib['position']
+                )
+                p = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+                result, _ = p.communicate()
+                gain = float(result.decode().strip()[1:-1])
+                block.gain = gain
+    if not block.gain:
+        logger.info("Тип блока: {0}, ID блока: {1}".format(block_type, block_id))
+    else:
+        logger.info("Тип блока: {0}, ID блока: {1}, коэффициент: {2}".format(block_type, block_id, block.gain))
+    blocks.append(block)
