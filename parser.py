@@ -72,7 +72,7 @@ class Parser:
         for item in self.model.iter('BasicBlock'):
             block_type = item.attrib['interfaceFunctionName']
             block_id = item.attrib['id']
-            if block_type not in ['INTEGRAL_f', 'DIFF_f', 'GAIN_f', 'DEMUX', 'SUM_f']:
+            if block_type not in ['INTEGRAL_f', 'DIFF_f', 'GAIN_f', 'DEMUX_f', 'SUM_f']:
                 self.logger.error("Неивестный тип блока: {0}".format(block_type))
                 exit(1)
             block = Block(block_type, block_id)
@@ -124,7 +124,7 @@ class Parser:
         self.logger.info("Упрощение модели...")
         to_remove = set()
         for block in self.blocks:
-            if block.block_type == 'DEMUX':
+            if block.block_type == 'DEMUX_f':
                 source = self.find_block(list(block.inputs)[0])
                 source.outputs.remove(block.block_id)
                 for output in block.outputs:
