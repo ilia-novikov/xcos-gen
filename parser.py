@@ -11,6 +11,7 @@ from block import Block
 DEBUG = False
 SCILAB_ROOT = '/home/ilia/scilab-5.5.2/'
 JAVA = '/usr/lib/jvm/jdk1.8.0_72/bin/java'
+JGRAPHX = '/home/ilia/Downloads/'
 
 
 class Parser:
@@ -55,7 +56,10 @@ class Parser:
             if DEBUG:
                 archive.extract(self.content_file)
             with archive.open(self.content_file) as file:
-                content_tree = ET.fromstring(file.read().decode().replace('RoundBlock', 'BasicBlock'))
+                raw = file.read().decode()
+                raw = raw.replace('RoundBlock', 'BasicBlock')
+                raw = raw.replace('SplitBlock', 'BasicBlock')
+                content_tree = ET.fromstring(raw)
             archive.extract(self.source_data_file, './')
             shutil.move(self.source_data_file, self.destination_data_file)
             shutil.rmtree(self.source_data_file.split('/')[0])
@@ -70,19 +74,20 @@ class Parser:
         self.logger.info("Поиск базовых блоков...")
         blocks = []
         for item in self.model.iter('BasicBlock'):
-            block_type = item.attrib['interfaceFunctionName']
+            block_type = item.attrib['interfaceFunctionName'] if 'interfaceFunctionName' in item.attrib else 'SPLIT'
             block_id = item.attrib['id']
-            if block_type not in ['INTEGRAL_f', 'DIFF_f', 'GAIN_f', 'DEMUX_f', 'SUM_f']:
+            if block_type not in ['INTEGRAL_f', 'DIFF_f', 'GAIN_f', 'SUM_f', 'SPLIT']:
                 self.logger.error("Неивестный тип блока: {0}".format(block_type))
                 exit(1)
             block = Block(block_type, block_id)
             if block_type == 'GAIN_f':
                 for child in item.iter('ScilabDouble'):
                     if child.attrib['as'] == 'realParameters':
-                        command = '{0} -classpath {1}:{2} Extractor {3} {4}'.format(
+                        command = '{0} -classpath {1}:{2}:{3} Extractor {4} {5}'.format(
                             JAVA,
                             os.path.dirname(__file__),
                             SCILAB_ROOT + 'share/scilab/modules/types/jar/org.scilab.modules.types.jar',
+                            JGRAPHX + 'jgraphx.jar',
                             os.path.dirname(__file__) + '/' + self.destination_data_file,
                             child.attrib['position']
                         )
@@ -124,7 +129,7 @@ class Parser:
         self.logger.info("Упрощение модели...")
         to_remove = set()
         for block in self.blocks:
-            if block.block_type == 'DEMUX_f':
+            if block.block_type == 'SPLIT':
                 source = self.find_block(list(block.inputs)[0])
                 source.outputs.remove(block.block_id)
                 for output in block.outputs:
