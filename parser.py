@@ -1,4 +1,3 @@
-import logging.handlers
 import os
 import sys
 import zipfile
@@ -7,6 +6,7 @@ import shutil
 import subprocess
 
 from block import Block
+import utils
 
 DEBUG = False
 SCILAB_ROOT = '/home/ilia/scilab-5.5.2/'
@@ -20,25 +20,11 @@ class Parser:
     destination_data_file = 'data.bin'
 
     def __init__(self, model_file):
-        self.logger = self.initialize_logger()
+        self.logger = utils.get_logger()
         self.model = self.load_model(model_file)
         self.blocks = self.get_basic_blocks()
         self.get_links()
         self.simplify()
-
-    @staticmethod
-    def initialize_logger():
-        formatter = logging.Formatter(
-            fmt='xcos-gen :: %(levelname)s @ [%(asctime)s] %(message)s',
-            datefmt='%d-%m-%Y / %H:%M:%S'
-        )
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-        return logger
 
     def load_model(self, model_file):
         self.logger.info('-------------------------------')
@@ -163,7 +149,7 @@ class Parser:
                 target.tag
             ))
         self.logger.info('-------------------------------')
-        self.logger.info("Обработка связей типа блок -> блок")
+        self.logger.info("Обработка связей...")
         for item in links:
             source, target = self.find_endpoints(item)
             if source.tag == 'BasicBlock' and target.tag == 'BasicBlock':
@@ -180,6 +166,7 @@ class Parser:
 
     def finalize(self):
         os.remove(self.destination_data_file)
+
 
 parser = Parser('./model.zcos')
 parser.finalize()
