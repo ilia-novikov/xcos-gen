@@ -1,3 +1,24 @@
+"""
+
+    This file is part of xcos-gen.
+
+    xcos-gen is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    xcos-gen is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with xcos-gen. If not, see <http://www.gnu.org/licenses/>.
+
+    Author: Ilia Novikov <ilia.novikov@live.ru>
+
+"""
+
 import os
 import sys
 import zipfile
@@ -27,7 +48,7 @@ class Parser:
         self.simplify()
 
     def load_model(self, model_file):
-        self.logger.info('-------------------------------')
+        self.logger.info(utils.separator)
         self.logger.info("Загрузка модели...")
         if not os.path.exists(model_file) or not os.path.isfile(model_file):
             self.logger.error("Файл модели не найден: {0}".format(model_file))
@@ -56,7 +77,7 @@ class Parser:
         return model
 
     def get_basic_blocks(self):
-        self.logger.info('-------------------------------')
+        self.logger.info(utils.separator)
         self.logger.info("Поиск базовых блоков...")
         blocks = []
         for item in self.model.iter('BasicBlock'):
@@ -64,7 +85,7 @@ class Parser:
             block_id = item.attrib['id']
             if block_type not in ['INTEGRAL_f', 'DIFF_f', 'GAIN_f', 'SUM_f', 'SPLIT']:
                 self.logger.error("Неивестный тип блока: {0}".format(block_type))
-                exit(1)
+                sys.exit(1)
             block = Block(block_type, block_id)
             if block_type == 'GAIN_f':
                 for child in item.iter('ScilabDouble'):
@@ -91,6 +112,7 @@ class Parser:
                 ))
             blocks.append(block)
         self.logger.info("Найдено базовых блоков: {0}".format(len(blocks)))
+        os.remove(self.destination_data_file)
         return blocks
 
     def find_item(self, item_id):
@@ -111,7 +133,7 @@ class Parser:
         return source, target
 
     def simplify(self):
-        self.logger.info('-------------------------------')
+        self.logger.info(utils.separator)
         self.logger.info("Упрощение модели...")
         to_remove = set()
         for block in self.blocks:
@@ -138,7 +160,7 @@ class Parser:
             self.blocks.remove(block)
 
     def get_links(self):
-        self.logger.info('-------------------------------')
+        self.logger.info(utils.separator)
         self.logger.info("Поиск связей...")
         links = list([x for x in self.model.iter('ExplicitLink')])
         for item in links:
@@ -148,7 +170,7 @@ class Parser:
                 source.tag,
                 target.tag
             ))
-        self.logger.info('-------------------------------')
+        self.logger.info(utils.separator)
         self.logger.info("Обработка связей...")
         for item in links:
             source, target = self.find_endpoints(item)
@@ -163,7 +185,3 @@ class Parser:
             target_block.block_type
         ))
         source_block.connect(target_block)
-
-    def finalize(self):
-        os.remove(self.destination_data_file)
-

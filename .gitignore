@@ -1,6 +1,7 @@
 *.zcos
 *.xml
 *.bin
+*.v
 
 .idea/
 __pycache__/

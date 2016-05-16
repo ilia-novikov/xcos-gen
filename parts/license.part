@@ -1,4 +1,4 @@
-"""
+/*
 
     This file is part of xcos-gen.
 
@@ -17,17 +17,5 @@
 
     Author: Ilia Novikov <ilia.novikov@live.ru>
 
-"""
+*/
 
-from parser import Parser
-from template_builder import TemplateBuilder
-import utils
-
-logger = utils.get_logger('main')
-logger.info("xcos-gen, версия {0}, разработчик {1}".format(
-    utils.__version__,
-    utils.__author__
-))
-
-parser = Parser('./model.zcos')
-builder = TemplateBuilder('default.template')

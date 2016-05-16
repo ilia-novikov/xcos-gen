@@ -1,0 +1,5 @@
+:info "Стандартный шаблон xcos-gen"
+:include parts/license
+:include parts/header
+:block body
+:include parts/footer
