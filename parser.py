@@ -20,7 +20,7 @@ class Parser:
     destination_data_file = 'data.bin'
 
     def __init__(self, model_file):
-        self.logger = utils.get_logger()
+        self.logger = utils.get_logger(__name__)
         self.model = self.load_model(model_file)
         self.blocks = self.get_basic_blocks()
         self.get_links()
@@ -167,6 +167,3 @@ class Parser:
     def finalize(self):
         os.remove(self.destination_data_file)
 
-
-parser = Parser('./model.zcos')
-parser.finalize()
