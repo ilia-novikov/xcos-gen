@@ -6,8 +6,13 @@
 :assoc DIFF_f sd_diff
 :assoc SUM_f sd_adder
 
+; Задание типов сигнала
+:input sigma-delta
+:output normal
+
 ; Подключение шаблонов
 :include parts/license
+:include parts/about
 :include parts/header
 :block body
 :include parts/footer

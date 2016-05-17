@@ -180,7 +180,7 @@ class Parser:
     def connect_basic_blocks(self, source, target):
         source_block = self.find_block(source.attrib['id'])
         target_block = self.find_block(target.attrib['id'])
-        self.logger.info("Создано соединение: {0} -> {1}".format(
+        self.logger.info("Создаю соединение: {0} -> {1}".format(
             source_block.block_type,
             target_block.block_type
         ))
