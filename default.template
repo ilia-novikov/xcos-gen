@@ -1,4 +1,12 @@
 :info "Стандартный шаблон xcos-gen"
+
+; Ассоциация блоков xcos и HDL
+:assoc INTEGRAL_f sd_integrator
+:assoc GAIN_f sd_mult_2in
+:assoc DIFF_f sd_diff
+:assoc SUM_f sd_adder
+
+; Подключение шаблонов
 :include parts/license
 :include parts/header
 :block body

@@ -24,11 +24,13 @@ import shlex
 import sys
 
 import utils
+from parser import Parser
 
 
 class TemplateBuilder:
     def __init__(self, filename):
         self.logger = utils.get_logger(__name__)
+        self.assoc = {}
         self.template = ''
         self.preprocess(filename)
 
@@ -48,7 +50,7 @@ class TemplateBuilder:
                     sys.exit(1)
                 split = shlex.split(line)
                 command = split[0][1:]
-                if command not in ['include', 'block', 'warning', 'info']:
+                if command not in ['include', 'block', 'warning', 'info', 'assoc']:
                     self.logger.error("Некорректный синтаксис в шаблоне: {0}".format(line))
                     sys.exit(1)
                 if command == 'include':
@@ -60,6 +62,9 @@ class TemplateBuilder:
                     self.logger.info('{0}: {1}'.format(filename, split[1]))
                 if command == 'warning':
                     self.logger.warning('{0}: {1}'.format(filename, split[1]))
+                if command == 'assoc':
+                    self.logger.info("Создана ассоциация {0} -> {1}".format(split[1], split[2]))
+                    self.assoc[split[1]] = split[2]
         self.template += '\n'
 
     def include(self, part):
@@ -70,3 +75,12 @@ class TemplateBuilder:
             sys.exit(1)
         with open(filename) as file:
             self.template += file.read()
+
+    def build(self, parser: Parser):
+        self.logger.info(utils.separator)
+        self.logger.info("Запускаю сборку шаблона...")
+        blocks = parser.blocks
+        for block in blocks:
+            if block.block_type not in self.assoc:
+                self.logger.error("Не найдена ассоциация для блока: {0}".format(block.block_type))
+                sys.exit(1)
