@@ -9,12 +9,12 @@
 :name example_module
 
 ; Задание типов сигнала
-:module_input sigma-delta
+:module_input normal 16
 :module_output normal 16
 
 ; Подключение шаблонов
 :include parts/license
 :include parts/about
 :include parts/header
-:block body
+:body
 :include parts/footer

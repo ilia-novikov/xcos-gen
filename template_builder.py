@@ -36,6 +36,9 @@ class TemplateBuilder:
         self.assoc = {}
         self.module_name = 'regulator'
         self.template = ''
+        self.body = ''
+        self.block_ids = {}
+        self.wire_id = 0
         self.module_params = []
         self.module_ports = {
             'module_input': {
@@ -72,7 +75,7 @@ class TemplateBuilder:
         split = shlex.split(line)
         commands = {
             'include': lambda: self.include(split[1]),
-            'block': lambda: self.create_block(split[1]),
+            'body': lambda: self.place_body(),
             'info': lambda: self.logger.info(split[1]),
             'warning': lambda: self.logger.warning(split[1]),
             'assoc': lambda: self.create_association(split[1], split[2]),
@@ -88,7 +91,7 @@ class TemplateBuilder:
         commands[command]()
 
     def include(self, part):
-        self.logger.info("Выполняю импорт {0}...".format(part))
+        self.logger.info("Выполняю импорт {0}".format(part))
         filename = '{0}.part'.format(part)
         if not os.path.exists(filename):
             self.logger.error("Файл для импорта не найден: {0}".format(filename))
@@ -110,20 +113,42 @@ class TemplateBuilder:
     def build(self, parser: Parser):
         self.logger.info(utils.separator)
         self.logger.info("Запускаю сборку шаблона...")
-        # noinspection PyTypeChecker
         self.template = self.template.format(**SafeDict({
             'module_name': self.module_name,
             'module_params': self.get_module_params(),
             'module_ports': self.get_module_ports()
         }))
         blocks = parser.blocks
+        entrance_count = 0
         for block in blocks:
             if block.block_type not in self.assoc:
                 self.logger.error("Не найдена ассоциация для блока: {0}".format(block.block_type))
                 sys.exit(1)
+            if len(block.inputs) == 0:
+                entrance_count += 1
+        if entrance_count > 1:
+            self.logger.error("В модели более 1 блока без входов. Невозможно выбрать начальный блок")
+            sys.exit(1)
+        initial_wire = 'in'
+        if self.module_ports['module_input']['type'] == 'normal':
+            self.logger.info("Добавляю сигма-дельта модулятор")
+            initial_wire = self.place_wire(2)
+            self.place_hdl_block('sd_modulator', {
+                'N': self.module_ports['module_input']['width'],
+                'k': 1,
+                'ext_feedback': 0,
+                'bin': 1
+            }, {
+                'x': 'in',
+                'y_feedback': 0,
+                'y': initial_wire
+            })
+        for block in parser.blocks:
+            self.place_xcos_block(block)
+        self.template = self.template.format(**SafeDict({'body': self.body}))
 
-    def create_block(self, name):
-        self.template += '{{{0}}}\n'.format(name)
+    def place_body(self):
+        self.template += '{body}\n'
 
     def create_param(self, name, value):
         self.logger.info("Добавляю параметр {0} со значением {1}".format(name, value))
@@ -206,3 +231,31 @@ class TemplateBuilder:
         printable_ports += ',\n'.join(self.get_printable_port(port) for port in ports)
         printable_ports += '\n'
         return printable_ports
+
+    def place_hdl_block(self, name, params, ports):
+        ports['clk'] = 'clk'
+        ports['rst'] = 'rst'
+        if name in self.block_ids:
+            self.block_ids[name] += 1
+        else:
+            self.block_ids[name] = 0
+        instance_name = '{0}_{1}'.format(name, self.block_ids[name])
+        self.logger.info("Создаю блок {0}".format(name))
+        printable = name
+        template = '    .{0}({1})'
+        if params:
+            printable_params = ',\n'.join(template.format(key, params[key]) for key in params.keys())
+            printable += ' #(\n{0}\n)'.format(printable_params)
+        printable_ports = ',\n'.join(template.format(key, ports[key]) for key in ports.keys())
+        printable += ' {0} (\n{1}\n)'.format(instance_name, printable_ports)
+        self.body += printable + '\n'
+
+    def place_wire(self, width):
+        name = 'wire_{0}'.format(self.wire_id)
+        self.wire_id += 1
+        self.logger.info("Добавляю провод: {0}".format(name))
+        self.body += 'wire [{0}:1] {1};\n'.format(width, name)
+        return name
+
+    def place_xcos_block(self, block):
+        pass
