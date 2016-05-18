@@ -171,7 +171,7 @@ class TemplateBuilder:
             return ''
         template = '    {0} = {1}'
         printable_params = ',\n'.join(template.format(param['name'], param['value']) for param in self.module_params)
-        return '#(\n{0}\n)'.format(printable_params)
+        return '#(\n    parameter\n{0}\n)'.format(printable_params)
 
     @staticmethod
     def get_printable_port(port):
