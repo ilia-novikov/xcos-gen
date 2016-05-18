@@ -6,9 +6,11 @@
 :assoc DIFF_f sd_diff
 :assoc SUM_f sd_adder
 
+:name example_module
+
 ; Задание типов сигнала
-:input sigma-delta
-:output normal
+:module_input sigma-delta
+:module_output normal 16
 
 ; Подключение шаблонов
 :include parts/license

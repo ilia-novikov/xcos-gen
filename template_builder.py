@@ -34,11 +34,18 @@ class TemplateBuilder:
     def __init__(self, filename):
         self.logger = utils.get_logger(__name__)
         self.assoc = {}
+        self.module_name = 'regulator'
         self.template = ''
         self.module_params = []
-        self.connection_type = {
-            'input': 'sigma-delta',
-            'output': 'sigma-delta'
+        self.module_ports = {
+            'module_input': {
+                'type': 'sigma-delta',
+                'width': 2
+            },
+            'module_output': {
+                'type': 'sigma-delta',
+                'width': 2
+            }
         }
         self.creation_date = datetime.datetime.now()
         self.preprocess(filename)
@@ -70,8 +77,9 @@ class TemplateBuilder:
             'warning': lambda: self.logger.warning(split[1]),
             'assoc': lambda: self.create_association(split[1], split[2]),
             'param': lambda: self.create_param(split[1], split[2]),
-            'input': lambda: self.set_connection_type(command, split[1]),
-            'output': lambda: self.set_connection_type(command, split[1])
+            'module_input': lambda: self.set_module_port(command, split),
+            'module_output': lambda: self.set_module_port(command, split),
+            'name': lambda: self.set_module_name(split[1])
         }
         command = split[0][1:]
         if command not in commands:
@@ -102,6 +110,12 @@ class TemplateBuilder:
     def build(self, parser: Parser):
         self.logger.info(utils.separator)
         self.logger.info("Запускаю сборку шаблона...")
+        # noinspection PyTypeChecker
+        self.template = self.template.format(**SafeDict({
+            'module_name': self.module_name,
+            'module_params': self.get_module_params(),
+            'module_ports': self.get_module_ports()
+        }))
         blocks = parser.blocks
         for block in blocks:
             if block.block_type not in self.assoc:
@@ -112,21 +126,33 @@ class TemplateBuilder:
         self.template += '{{{0}}}\n'.format(name)
 
     def create_param(self, name, value):
-        self.logger.info("Добавляю параметр '{0}' со значением {1}".format(name, value))
-        self.module_params.append({name: int(value)})
+        self.logger.info("Добавляю параметр {0} со значением {1}".format(name, value))
+        self.module_params.append({
+            'name': name,
+            'value': int(value)
+        })
 
-    def set_connection_type(self, name, value):
+    def set_module_port(self, name, value):
         printable = {
-            'input': "вход",
-            'output': "выход",
+            'module_input': "вход",
+            'module_output': "выход",
             'sigma-delta': "сигма-дельта",
             'normal': "обычный"
         }
-        if value not in ['sigma-delta', 'normal']:
-            self.logger.error("Неверный тип сигнала '{0}': {1}".format(name, value))
+        port_type = value[1]
+        if port_type not in ['sigma-delta', 'normal']:
+            self.logger.error("Неверный тип сигнала '{0}': {1}".format(name, port_type))
             sys.exit(1)
-        self.logger.info("Задаю тип сигнала на {0}е модуля: {1}".format(printable[name], printable[value]))
-        self.connection_type[name] = value
+        port_width = 2 if port_type == 'sigma-delta' else int(value[2])
+        self.logger.info("Задаю тип сигнала на {0}е модуля: {1} шириной {2} бит".format(
+            printable[name],
+            printable[port_type],
+            port_width
+        ))
+        self.module_ports[name] = {
+            'type': port_type,
+            'width': port_width
+        }
 
     def fill_module_info(self):
         self.template = self.template.format(**SafeDict({
@@ -134,3 +160,49 @@ class TemplateBuilder:
             'time_spent': (datetime.datetime.now() - self.creation_date).microseconds,
             'used_cores': ', '.join([x['name'] for x in self.assoc.values()])
         }))
+
+    def set_module_name(self, name):
+        self.logger.info("Задаю имя модуля HDL как {0}".format(name))
+        self.module_name = name
+
+    def get_module_params(self):
+        self.logger.info("Создаю параметры модуля")
+        if not self.module_params:
+            return ''
+        template = '    {0} = {1}'
+        printable_params = ',\n'.join(template.format(param['name'], param['value']) for param in self.module_params)
+        return '#(\n{0}\n)'.format(printable_params)
+
+    @staticmethod
+    def get_printable_port(port):
+        if 'width' in port:
+            return '    {0} [{1}:0] {2}'.format(port['type'], port['width'] - 1, port['name'])
+        else:
+            return '    {0} {1}'.format(port['type'], port['name'])
+
+    def get_module_ports(self):
+        self.logger.info("Создаю порты модуля")
+        ports = [
+            {
+                'type': 'input',
+                'name': 'clk'
+            },
+            {
+                'type': 'input',
+                'name': 'reset'
+            },
+            {
+                'type': 'input',
+                'name': 'in',
+                'width': self.module_ports['module_input']['width']
+            },
+            {
+                'type': 'output',
+                'name': 'out',
+                'width': self.module_ports['module_output']['width']
+            }
+        ]
+        printable_ports = '\n'
+        printable_ports += ',\n'.join(self.get_printable_port(port) for port in ports)
+        printable_ports += '\n'
+        return printable_ports

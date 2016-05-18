@@ -32,3 +32,6 @@ logger.info("xcos-gen, версия {0}, разработчик {1}".format(
 parser = Parser('./model.zcos')
 builder = TemplateBuilder('default.template')
 builder.build(parser)
+
+with open('output.v', 'w') as file:
+    file.write(builder.template)
