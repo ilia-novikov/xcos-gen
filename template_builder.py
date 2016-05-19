@@ -41,6 +41,7 @@ class TemplateBuilder:
         self.body = ''
         self.block_ids = {}
         self.wire_id = 0
+        self.removed_wires = []
         self.module_params = []
         self.module_ports = {
             'module_input': {
@@ -132,10 +133,10 @@ class TemplateBuilder:
         if entrance_count > 1:
             self.logger.error("В модели более 1 блока без входов. Невозможно выбрать начальный блок")
             sys.exit(1)
-        initial_wire = 'in'
+        in_wire = 'in'
         if self.module_ports['module_input']['type'] == 'normal':
             self.logger.info("Добавляю сигма-дельта модулятор")
-            initial_wire = self.place_wire(2)
+            in_wire = self.place_wire(2)
             params = {
                 'N': self.module_ports['module_input']['width'],
                 'k': 1,
@@ -145,20 +146,35 @@ class TemplateBuilder:
             ports = {
                 'x': 'in',
                 'y_feedback': 0,
-                'y': initial_wire
+                'y': in_wire
             }
             self.place_hdl_block('sd_modulator', params, ports)
             self.body += '\n'
         for block in parser.blocks:
             self.hdl_blocks.append(HdlBlock(block, self.assoc[block.block_type]['name']))
         self.reconnect_hdl_blocks()
-        self.find_input_wire(initial_wire, initial_wire != 'in')
+        self.find_input_wire(in_wire, in_wire != 'in')
         self.body += '\n\n'
         self.logger.info(utils.separator)
         self.logger.info("Запускаю генерацию блоков HDL")
         for hdl_block in self.hdl_blocks:
             self.create_hdl_block(hdl_block)
+        if self.module_ports['module_output']['type'] == 'normal':
+            self.logger.info(utils.separator)
+            self.logger.info("Добавляю сигма-дельта демодулятор")
+            params = {
+                'N': self.module_ports['module_output']['width']
+            }
+            ports = {
+                'x': self.find_output_wire(),
+                'y': 'out'
+            }
+            self.place_hdl_block('sd_av_demodulator', params, ports)
+            self.body += '\n'
         self.template = self.template.format(**SafeDict({'body': self.body}))
+        self.prettify()
+        self.logger.info(utils.separator)
+        self.logger.info("Сборка шаблона завершена")
 
     def place_body(self):
         self.template += '{body}\n'
@@ -301,6 +317,7 @@ class TemplateBuilder:
             self.logger.error("Невозможно выбрать входной сигнал")
             sys.exit(1)
         model_input_wire = wires[0]
+        self.removed_wires.append(model_input_wire)
         self.logger.info("Входной сигнал модели: {0}".format(model_input_wire))
         for hdl_block in self.hdl_blocks:
             if hdl_block.in_wire == model_input_wire:
@@ -414,3 +431,35 @@ class TemplateBuilder:
             'pcm_y': 0
         }
         self.place_hdl_block(hdl_block.block_type, params, ports)
+
+    def prettify(self):
+        self.logger.info(utils.separator)
+        self.logger.info("Вношу косметические изменения...")
+        to_remove = []
+        lines = self.template.splitlines()
+        for i in range(0, len(lines) - 1):
+            if not lines[i] and not lines[i + 1]:
+                to_remove.append(i)
+        self.template = '\n'.join(lines[x] for x in range(0, len(lines)) if x not in to_remove)
+
+    def find_output_wire(self):
+        self.logger.info(utils.separator)
+        self.logger.info("Выполняю переподключение выходного сигнала...")
+        wires = ['wire_{0}'.format(x) for x in range(0, self.wire_id)]
+        for hdl_block in self.hdl_blocks:
+            if isinstance(hdl_block.in_wire, list):
+                for i in hdl_block.in_wire:
+                    if i in wires:
+                        wires.remove(i)
+            else:
+                if hdl_block.in_wire in wires:
+                    wires.remove(hdl_block.in_wire)
+        for i in self.removed_wires:
+            if i in wires:
+                wires.remove(i)
+        if not wires or len(wires) > 1:
+            self.logger.error("Невозможно выбрать выходной сигнал")
+            sys.exit(1)
+        model_output_wire = wires[0]
+        self.logger.info("Выходной сигнал модели: {0}".format(model_output_wire))
+        return model_output_wire
