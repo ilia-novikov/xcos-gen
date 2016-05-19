@@ -18,12 +18,14 @@
     Author: Ilia Novikov <ilia.novikov@live.ru>
 
 """
+
 import datetime
 import os
 import shlex
 import sys
 
 import utils
+from hdl_block import HdlBlock
 from parser import Parser
 from safe_dict import SafeDict
 
@@ -50,6 +52,7 @@ class TemplateBuilder:
                 'width': 2
             }
         }
+        self.hdl_blocks = []
         self.creation_date = datetime.datetime.now()
         self.preprocess(filename)
         self.fill_module_info()
@@ -144,7 +147,11 @@ class TemplateBuilder:
                 'y': initial_wire
             })
         for block in parser.blocks:
-            self.place_xcos_block(block)
+            self.hdl_blocks.append(HdlBlock(block, self.assoc[block.block_type]['name']))
+        self.reconnect_hdl_blocks()
+        self.find_input_wire(initial_wire, initial_wire != 'in')
+        for hdl_block in self.hdl_blocks:
+            self.create_hdl_block(hdl_block)
         self.template = self.template.format(**SafeDict({'body': self.body}))
 
     def place_body(self):
@@ -232,6 +239,9 @@ class TemplateBuilder:
         printable_ports += '\n'
         return printable_ports
 
+    def create_hdl_block(self, hdl_block):
+        pass
+
     def place_hdl_block(self, name, params, ports):
         ports['clk'] = 'clk'
         ports['rst'] = 'rst'
@@ -250,12 +260,66 @@ class TemplateBuilder:
         printable += ' {0} (\n{1}\n)'.format(instance_name, printable_ports)
         self.body += printable + '\n'
 
-    def place_wire(self, width):
+    def place_wire(self, width=2):
         name = 'wire_{0}'.format(self.wire_id)
         self.wire_id += 1
         self.logger.info("Добавляю провод: {0}".format(name))
         self.body += 'wire [{0}:1] {1};\n'.format(width, name)
         return name
 
-    def place_xcos_block(self, block):
-        pass
+    def find_hdl_block(self, block_id) -> HdlBlock:
+        for block in self.hdl_blocks:
+            if block.block_id == block_id:
+                return block
+        return None
+
+    def find_input_wire(self, replace_wire, ignore_first=False):
+        self.logger.info(utils.separator)
+        self.logger.info("Выполняю переподключение входного сигнала...")
+        start_index = 1 if ignore_first else 0
+        wires = ['wire_{0}'.format(x) for x in range(start_index, self.wire_id)]
+        for hdl_block in self.hdl_blocks:
+            if hdl_block.out_wire in wires:
+                wires.remove(hdl_block.out_wire)
+        if not wires or len(wires) > 1:
+            self.logger.error("Невозможно выбрать входной сигнал")
+            sys.exit(1)
+        model_input_wire = wires[0]
+        self.logger.info("Входной сигнал модели: {0}".format(model_input_wire))
+        for hdl_block in self.hdl_blocks:
+            if hdl_block.in_wire == model_input_wire:
+                self.logger.info("Замена входного сигнала для {0} на {1}".format(hdl_block.block_type, replace_wire))
+                hdl_block.in_wire = replace_wire
+                break
+        lines = self.body.splitlines()
+        for i in range(0, len(lines)):
+            if model_input_wire in lines[i]:
+                self.logger.info("Сигнал {0} был удален".format(model_input_wire))
+                lines.remove(lines[i])
+                self.body = '\n'.join(lines)
+                break
+
+    def reconnect_hdl_blocks(self):
+        self.logger.info(utils.separator)
+        self.logger.info("Выполняю создание соединений...")
+        for hdl_block in self.hdl_blocks:
+            for source in hdl_block.inputs:
+                source_block = self.find_hdl_block(source)
+                if source_block.out_wire:
+                    hdl_block.in_wire = source_block.out_wire
+                    break
+            if not hdl_block.in_wire:
+                hdl_block.in_wire = self.place_wire()
+                for source in hdl_block.inputs:
+                    source_block = self.find_hdl_block(source)
+                    source_block.out_wire = hdl_block.in_wire
+            for target in hdl_block.outputs:
+                target_block = self.find_hdl_block(target)
+                if target_block.in_wire:
+                    hdl_block.out_wire = target_block.in_wire
+                    break
+            if not hdl_block.out_wire:
+                hdl_block.out_wire = self.place_wire()
+                for target in hdl_block.outputs:
+                    target_block = self.find_hdl_block(target)
+                    target_block.in_wire = hdl_block.out_wire

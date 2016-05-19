@@ -20,11 +20,24 @@
 """
 
 
-class SafeDict(dict):
-    def __init__(self, d, **kwargs):
-        super().__init__(**kwargs)
-        for key in d.keys():
-            self[key] = d[key]
+class HdlBlock:
+    def __init__(self, block, hdl_type):
+        self.block_type = hdl_type
+        self.block_id = block.block_id
+        self.gain = block.gain
+        self.inputs = block.inputs
+        self.outputs = block.outputs
+        self.in_wire = ''
+        self.out_wire = ''
 
-    def __missing__(self, key):
-        return '{' + key + '}'
+    def __str__(self):
+        if not self.gain:
+            return "{0}: {1}, {2} -> {3}".format(self.block_type, self.block_id, self.in_wire, self.out_wire)
+        else:
+            return "{0}: {1}, k = {2}, {3} -> {4}".format(
+                self.block_type,
+                self.block_id,
+                self.gain,
+                self.in_wire,
+                self.out_wire
+            )
