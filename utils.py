@@ -27,7 +27,7 @@ __author__ = 'Ilia Novikov <ilia.novikov@live.ru>'
 separator = '-------------------------------'
 
 
-def get_logger(name):
+def get_logger(name: str) -> logging.Logger:
     formatter = logging.Formatter(
         fmt='xcos-gen::{0} %(levelname)s @ [%(asctime)s] %(message)s'.format(name),
         datefmt='%d-%m-%Y / %H:%M:%S'

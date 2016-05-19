@@ -18,10 +18,11 @@
     Author: Ilia Novikov <ilia.novikov@live.ru>
 
 """
+from block import Block
 
 
 class HdlBlock:
-    def __init__(self, block, hdl_type):
+    def __init__(self, block: Block, hdl_type: str):
         self.block_type = hdl_type
         self.block_id = block.block_id
         self.gain = block.gain

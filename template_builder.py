@@ -33,7 +33,7 @@ CORES_DIR = '/home/ilia/src/sc_cores'
 
 
 class TemplateBuilder:
-    def __init__(self, filename):
+    def __init__(self, filename: str):
         self.logger = utils.get_logger(__name__)
         self.assoc = {}
         self.module_name = 'regulator'
@@ -57,7 +57,7 @@ class TemplateBuilder:
         self.preprocess(filename)
         self.fill_module_info()
 
-    def preprocess(self, filename):
+    def preprocess(self, filename: str):
         self.logger.info(utils.separator)
         self.logger.info("Запускаю обработку шаблона...")
         if not os.path.exists(filename):
@@ -68,7 +68,7 @@ class TemplateBuilder:
                 self.parse(line)
         self.template += '\n'
 
-    def parse(self, line):
+    def parse(self, line: str):
         line = line.strip()
         if line.startswith(';') or not line:
             return
@@ -93,7 +93,7 @@ class TemplateBuilder:
             sys.exit(1)
         commands[command]()
 
-    def include(self, part):
+    def include(self, part: str):
         self.logger.info("Выполняю импорт {0}".format(part))
         filename = '{0}.part'.format(part)
         if not os.path.exists(filename):
@@ -102,7 +102,7 @@ class TemplateBuilder:
         with open(filename) as file:
             self.template += file.read()
 
-    def create_association(self, source, target):
+    def create_association(self, source: str, target: str):
         self.logger.info("Создаю ассоциацию {0} -> {1}".format(source, target))
         filename = '{0}/{1}/hdl/{1}.v'.format(CORES_DIR, target)
         if not filename:
@@ -154,6 +154,8 @@ class TemplateBuilder:
         self.reconnect_hdl_blocks()
         self.find_input_wire(initial_wire, initial_wire != 'in')
         self.body += '\n\n'
+        self.logger.info(utils.separator)
+        self.logger.info("Запускаю генерацию блоков HDL")
         for hdl_block in self.hdl_blocks:
             self.create_hdl_block(hdl_block)
         self.template = self.template.format(**SafeDict({'body': self.body}))
@@ -161,14 +163,14 @@ class TemplateBuilder:
     def place_body(self):
         self.template += '{body}\n'
 
-    def create_param(self, name, value):
+    def create_param(self, name: str, value: str):
         self.logger.info("Добавляю параметр {0} со значением {1}".format(name, value))
         self.module_params.append({
             'name': name,
             'value': int(value)
         })
 
-    def set_module_port(self, name, value):
+    def set_module_port(self, name: str, value: str):
         printable = {
             'module_input': "вход",
             'module_output': "выход",
@@ -197,11 +199,11 @@ class TemplateBuilder:
             'used_cores': ', '.join([x['name'] for x in self.assoc.values()])
         }))
 
-    def set_module_name(self, name):
+    def set_module_name(self, name: str):
         self.logger.info("Задаю имя модуля HDL как {0}".format(name))
         self.module_name = name
 
-    def get_module_params(self):
+    def get_module_params(self) -> str:
         self.logger.info("Создаю параметры модуля")
         if not self.module_params:
             return ''
@@ -210,13 +212,13 @@ class TemplateBuilder:
         return '#(\n    parameter\n{0}\n)'.format(printable_params)
 
     @staticmethod
-    def get_printable_port(port):
+    def get_printable_port(port: dict) -> str:
         if 'width' in port:
             return '    {0} [{1}:0] {2}'.format(port['type'], port['width'] - 1, port['name'])
         else:
             return '    {0} {1}'.format(port['type'], port['name'])
 
-    def get_module_ports(self):
+    def get_module_ports(self) -> str:
         self.logger.info("Создаю порты модуля")
         ports = [
             {
@@ -243,7 +245,7 @@ class TemplateBuilder:
         printable_ports += '\n'
         return printable_ports
 
-    def create_hdl_block(self, hdl_block):
+    def create_hdl_block(self, hdl_block: HdlBlock):
         hdl_block_types = {
             'sd_adder': lambda: self.create_adder(hdl_block),
             'sd_mult_2in': lambda: self.create_multiplier(hdl_block),
@@ -256,7 +258,7 @@ class TemplateBuilder:
             self.logger.error("Неизвестен рецепт для генерации: {0}".format(hdl_block.block_type))
             sys.exit(1)
 
-    def place_hdl_block(self, name, params, ports):
+    def place_hdl_block(self, name: str, params: dict, ports: dict):
         ports['clk'] = 'clk'
         ports['rst'] = 'rst'
         if name in self.block_ids:
@@ -281,13 +283,13 @@ class TemplateBuilder:
         self.body += 'wire [{0}:0] {1};\n'.format(width - 1, name)
         return name
 
-    def find_hdl_block(self, block_id) -> HdlBlock:
+    def find_hdl_block(self, block_id: str) -> HdlBlock:
         for block in self.hdl_blocks:
             if block.block_id == block_id:
                 return block
         return None
 
-    def find_input_wire(self, replace_wire, ignore_first=False):
+    def find_input_wire(self, replace_wire: str, ignore_first=False):
         self.logger.info(utils.separator)
         self.logger.info("Выполняю переподключение входного сигнала...")
         start_index = 1 if ignore_first else 0

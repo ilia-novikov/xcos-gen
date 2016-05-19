@@ -40,14 +40,14 @@ class Parser:
     source_data_file = 'dictionary/dictionary.ser'
     destination_data_file = 'data.bin'
 
-    def __init__(self, model_file):
+    def __init__(self, model_file: str):
         self.logger = utils.get_logger(__name__)
         self.model = self.load_model(model_file)
         self.blocks = self.get_basic_blocks()
         self.get_links()
         self.simplify()
 
-    def load_model(self, model_file):
+    def load_model(self, model_file: str):
         self.logger.info(utils.separator)
         self.logger.info("Загрузка модели...")
         if not os.path.exists(model_file) or not os.path.isfile(model_file):
@@ -76,7 +76,7 @@ class Parser:
         self.logger.info("Загружено компонентов модели: {0}".format(len(model)))
         return model
 
-    def get_basic_blocks(self):
+    def get_basic_blocks(self) -> list:
         self.logger.info(utils.separator)
         self.logger.info("Поиск базовых блоков...")
         blocks = []
@@ -115,12 +115,12 @@ class Parser:
         os.remove(self.destination_data_file)
         return blocks
 
-    def find_item(self, item_id):
+    def find_item(self, item_id: str):
         for item in self.model:
             if item.attrib['id'] == item_id:
                 return item
 
-    def find_block(self, block_id) -> Block:
+    def find_block(self, block_id: str) -> Block:
         for item in self.blocks:
             if item.block_id == block_id:
                 return item
