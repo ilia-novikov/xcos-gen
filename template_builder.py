@@ -289,7 +289,7 @@ class TemplateBuilder:
             printable_params = ',\n'.join(template.format(key, params[key]) for key in params.keys())
             printable += ' #(\n{0}\n    )'.format(printable_params)
         printable_ports = ',\n'.join(template.format(key, ports[key]) for key in ports.keys())
-        printable += ' {0} (\n{1}\n    )'.format(instance_name, printable_ports)
+        printable += ' {0} (\n{1}\n    );'.format(instance_name, printable_ports)
         self.body += printable + '\n\n'
 
     def place_wire(self, width=2):
@@ -413,7 +413,7 @@ class TemplateBuilder:
     def create_integrator(self, hdl_block: HdlBlock):
         params = {
             'N': 31,
-            'Nmod': 'N + 1',
+            'Nmod': '31 + 1',
             'bin': 1,
             'doWin': 0,
             'doSrst': 0,
