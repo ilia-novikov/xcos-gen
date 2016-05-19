@@ -18,6 +18,7 @@
     Author: Ilia Novikov <ilia.novikov@live.ru>
 
 """
+
 from block import Block
 
 
@@ -28,8 +29,8 @@ class HdlBlock:
         self.gain = block.gain
         self.inputs = block.inputs
         self.outputs = block.outputs
-        self.in_wire = ''
-        self.out_wire = ''
+        self.in_wire = None
+        self.out_wire = None
 
     def __str__(self):
         if not self.gain:

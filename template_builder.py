@@ -267,20 +267,20 @@ class TemplateBuilder:
             self.block_ids[name] = 0
         instance_name = '{0}_{1}'.format(name, self.block_ids[name])
         self.logger.info("Создаю блок {0}".format(name))
-        printable = name
-        template = '    .{0}({1})'
+        printable = '    ' + name
+        template = '        .{0}({1})'
         if params:
             printable_params = ',\n'.join(template.format(key, params[key]) for key in params.keys())
-            printable += ' #(\n{0}\n)'.format(printable_params)
+            printable += ' #(\n{0}\n    )'.format(printable_params)
         printable_ports = ',\n'.join(template.format(key, ports[key]) for key in ports.keys())
-        printable += ' {0} (\n{1}\n)'.format(instance_name, printable_ports)
-        self.body += printable + '\n'
+        printable += ' {0} (\n{1}\n    )'.format(instance_name, printable_ports)
+        self.body += printable + '\n\n'
 
     def place_wire(self, width=2):
         name = 'wire_{0}'.format(self.wire_id)
         self.wire_id += 1
         self.logger.info("Добавляю провод: {0}".format(name))
-        self.body += 'wire [{0}:0] {1};\n'.format(width - 1, name)
+        self.body += '    wire [{0}:0] {1};\n'.format(width - 1, name)
         return name
 
     def find_hdl_block(self, block_id: str) -> HdlBlock:
@@ -322,8 +322,13 @@ class TemplateBuilder:
             for source in hdl_block.inputs:
                 source_block = self.find_hdl_block(source)
                 if source_block.out_wire:
-                    hdl_block.in_wire = source_block.out_wire
-                    break
+                    if hdl_block.block_type != 'sd_adder':
+                        hdl_block.in_wire = source_block.out_wire
+                        break
+                    else:
+                        if not hdl_block.in_wire:
+                            hdl_block.in_wire = []
+                            hdl_block.in_wire.append(source_block.out_wire)
             if not hdl_block.in_wire:
                 hdl_block.in_wire = self.place_wire()
                 for source in hdl_block.inputs:
@@ -331,30 +336,47 @@ class TemplateBuilder:
                     source_block.out_wire = hdl_block.in_wire
             for target in hdl_block.outputs:
                 target_block = self.find_hdl_block(target)
-                if target_block.in_wire:
+                if target_block.in_wire and target_block.block_type != 'sd_adder':
                     hdl_block.out_wire = target_block.in_wire
                     break
             if not hdl_block.out_wire:
                 hdl_block.out_wire = self.place_wire()
                 for target in hdl_block.outputs:
                     target_block = self.find_hdl_block(target)
-                    target_block.in_wire = hdl_block.out_wire
+                    if target_block.block_type != 'sd_adder':
+                        target_block.in_wire = hdl_block.out_wire
+                    else:
+                        if not target_block.in_wire:
+                            target_block.in_wire = []
+                        target_block.in_wire.append(hdl_block.out_wire)
 
-    def create_adder(self, hdl_block):
-        pass
+    def create_adder(self, hdl_block: HdlBlock):
+        if len(hdl_block.inputs) > 2:
+            self.logger.error("В данной версии не поддерживаются сумматоры с числом входов > 2")
+            sys.exit(1)
+        params = {
+            'bin': 0,
+            'N': 3
+        }
+        ports = {
+            'x': hdl_block.in_wire[0],
+            'y': hdl_block.in_wire[1],
+            's': hdl_block.out_wire
+        }
+        self.place_hdl_block(hdl_block.block_type, params, ports)
 
     def create_multiplier(self, hdl_block: HdlBlock):
-        ports = {
-            'x': hdl_block.in_wire,
-            'kp': hdl_block.gain,
-            'kn': -hdl_block.gain,
-            'y': hdl_block.out_wire
-        }
         params = {
             'N': 16,
             'outN': 2,
             'intN': 0,
             'bin': 0
+        }
+        ports = {
+            'x': hdl_block.in_wire,
+            'kp': hdl_block.gain,
+            'kn': -hdl_block.gain,
+            'y': hdl_block.out_wire
         }
         self.place_hdl_block(hdl_block.block_type, params, ports)
 

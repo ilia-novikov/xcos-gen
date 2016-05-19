@@ -40,8 +40,9 @@ class Parser:
     source_data_file = 'dictionary/dictionary.ser'
     destination_data_file = 'data.bin'
 
-    def __init__(self, model_file: str):
+    def __init__(self, model_file: str, enable_adder_optimization=True):
         self.logger = utils.get_logger(__name__)
+        self.adder_optimization = enable_adder_optimization
         self.model = self.load_model(model_file)
         self.blocks = self.get_basic_blocks()
         self.get_links()
@@ -145,7 +146,7 @@ class Parser:
                     target.inputs.remove(block.block_id)
                     source.connect(target)
                 to_remove.add(block)
-            if block.block_type == 'SUM_f':
+            if block.block_type == 'SUM_f' and self.adder_optimization:
                 for item in list(block.inputs):
                     neighbour = self.find_block(item)
                     if neighbour.block_type == 'SUM_f':

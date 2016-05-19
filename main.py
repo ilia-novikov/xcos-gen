@@ -29,7 +29,7 @@ logger.info("xcos-gen, версия {0}, разработчик {1}".format(
     utils.__author__
 ))
 
-parser = Parser('./model.zcos')
+parser = Parser('./model.zcos', False)
 builder = TemplateBuilder('default.template')
 builder.build(parser)
 
