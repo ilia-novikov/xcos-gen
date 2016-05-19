@@ -136,20 +136,24 @@ class TemplateBuilder:
         if self.module_ports['module_input']['type'] == 'normal':
             self.logger.info("Добавляю сигма-дельта модулятор")
             initial_wire = self.place_wire(2)
-            self.place_hdl_block('sd_modulator', {
+            params = {
                 'N': self.module_ports['module_input']['width'],
                 'k': 1,
                 'ext_feedback': 0,
                 'bin': 1
-            }, {
+            }
+            ports = {
                 'x': 'in',
                 'y_feedback': 0,
                 'y': initial_wire
-            })
+            }
+            self.place_hdl_block('sd_modulator', params, ports)
+            self.body += '\n'
         for block in parser.blocks:
             self.hdl_blocks.append(HdlBlock(block, self.assoc[block.block_type]['name']))
         self.reconnect_hdl_blocks()
         self.find_input_wire(initial_wire, initial_wire != 'in')
+        self.body += '\n\n'
         for hdl_block in self.hdl_blocks:
             self.create_hdl_block(hdl_block)
         self.template = self.template.format(**SafeDict({'body': self.body}))
@@ -240,7 +244,17 @@ class TemplateBuilder:
         return printable_ports
 
     def create_hdl_block(self, hdl_block):
-        pass
+        hdl_block_types = {
+            'sd_adder': lambda: self.create_adder(hdl_block),
+            'sd_mult_2in': lambda: self.create_multiplier(hdl_block),
+            'sd_diff': lambda: self.create_differentiator(hdl_block),
+            'sd_integrator': lambda: self.create_integrator(hdl_block)
+        }
+        if hdl_block.block_type in hdl_block_types:
+            hdl_block_types[hdl_block.block_type]()
+        else:
+            self.logger.error("Неизвестен рецепт для генерации: {0}".format(hdl_block.block_type))
+            sys.exit(1)
 
     def place_hdl_block(self, name, params, ports):
         ports['clk'] = 'clk'
@@ -264,7 +278,7 @@ class TemplateBuilder:
         name = 'wire_{0}'.format(self.wire_id)
         self.wire_id += 1
         self.logger.info("Добавляю провод: {0}".format(name))
-        self.body += 'wire [{0}:1] {1};\n'.format(width, name)
+        self.body += 'wire [{0}:0] {1};\n'.format(width - 1, name)
         return name
 
     def find_hdl_block(self, block_id) -> HdlBlock:
@@ -323,3 +337,56 @@ class TemplateBuilder:
                 for target in hdl_block.outputs:
                     target_block = self.find_hdl_block(target)
                     target_block.in_wire = hdl_block.out_wire
+
+    def create_adder(self, hdl_block):
+        pass
+
+    def create_multiplier(self, hdl_block: HdlBlock):
+        ports = {
+            'x': hdl_block.in_wire,
+            'kp': hdl_block.gain,
+            'kn': -hdl_block.gain,
+            'y': hdl_block.out_wire
+        }
+        params = {
+            'N': 16,
+            'outN': 2,
+            'intN': 0,
+            'bin': 0
+        }
+        self.place_hdl_block(hdl_block.block_type, params, ports)
+
+    def create_differentiator(self, hdl_block: HdlBlock):
+        params = {
+            'N': 15,
+            'k': 5,
+            'bin': 0
+        }
+        ports = {
+            'x': hdl_block.in_wire,
+            'y': hdl_block.out_wire,
+            'y_pcm': 0
+        }
+        self.place_hdl_block(hdl_block.block_type, params, ports)
+
+    def create_integrator(self, hdl_block: HdlBlock):
+        params = {
+            'N': 31,
+            'Nmod': 'N + 1',
+            'bin': 1,
+            'doWin': 0,
+            'doSrst': 0,
+            'doRVin': 0,
+            'doEn': 0
+        }
+        ports = {
+            'w': 0,
+            'x': hdl_block.in_wire,
+            'k': 1,
+            'rst_value': 0,
+            'sync_rst': 0,
+            'enable': 0,
+            'y': hdl_block.out_wire,
+            'pcm_y': 0
+        }
+        self.place_hdl_block(hdl_block.block_type, params, ports)
