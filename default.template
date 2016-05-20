@@ -16,5 +16,7 @@
 :include parts/license
 :include parts/about
 :include parts/header
-:body
+:block param_wires
+:block assign
+:block body
 :include parts/footer

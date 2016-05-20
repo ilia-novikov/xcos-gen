@@ -42,6 +42,8 @@ class TemplateBuilder:
         self.block_ids = {}
         self.wire_id = 0
         self.removed_wires = []
+        self.param_wire_id = 0
+        self.param_wires = []
         self.module_params = []
         self.module_ports = {
             'module_input': {
@@ -79,7 +81,7 @@ class TemplateBuilder:
         split = shlex.split(line)
         commands = {
             'include': lambda: self.include(split[1]),
-            'body': lambda: self.place_body(),
+            'block': lambda: self.place_block(split[1]),
             'info': lambda: self.logger.info(split[1]),
             'warning': lambda: self.logger.warning(split[1]),
             'assoc': lambda: self.create_association(split[1], split[2]),
@@ -172,12 +174,14 @@ class TemplateBuilder:
             self.place_hdl_block('sd_av_demodulator', params, ports)
             self.body += '\n'
         self.template = self.template.format(**SafeDict({'body': self.body}))
+        self.place_param_wires()
+        self.place_params_assign()
         self.prettify()
         self.logger.info(utils.separator)
         self.logger.info("Сборка шаблона завершена")
 
-    def place_body(self):
-        self.template += '{body}\n'
+    def place_block(self, name):
+        self.template += '{{{0}}}\n'.format(name)
 
     def create_param(self, name: str, value: str):
         self.logger.info("Добавляю параметр {0} со значением {1}".format(name, value))
@@ -391,8 +395,8 @@ class TemplateBuilder:
         }
         ports = {
             'x': hdl_block.in_wire,
-            'kp': hdl_block.gain,
-            'kn': -hdl_block.gain,
+            'kp': self.create_param_wire(16, hdl_block.gain),
+            'kn': self.create_param_wire(16, -hdl_block.gain),
             'y': hdl_block.out_wire
         }
         self.place_hdl_block(hdl_block.block_type, params, ports)
@@ -420,6 +424,7 @@ class TemplateBuilder:
             'doRVin': 0,
             'doEn': 0
         }
+        # TODO: Узнать о необходимости удаления pcm_y
         ports = {
             'w': 0,
             'x': hdl_block.in_wire,
@@ -463,3 +468,30 @@ class TemplateBuilder:
         model_output_wire = wires[0]
         self.logger.info("Выходной сигнал модели: {0}".format(model_output_wire))
         return model_output_wire
+
+    def create_param_wire(self, width, value):
+        name = 'param_wire_{0}'.format(self.param_wire_id)
+        self.logger.info("Создаю wire-параметр {0} со значением {1}".format(name, value))
+        self.param_wires.append({
+            'name': name,
+            'width': width,
+            'value': value
+        })
+        self.param_wire_id += 1
+        return name
+
+    def place_param_wires(self):
+        self.logger.info(utils.separator)
+        self.logger.info("Размещаю wire-параметры...")
+        printable = ''
+        for param_wire in self.param_wires:
+            printable += '    wire [{0}:0] {1};\n'.format(param_wire['width'] - 1, param_wire['name'])
+        self.template = self.template.format(**SafeDict({'param_wires': printable}))
+
+    def place_params_assign(self):
+        self.logger.info(utils.separator)
+        self.logger.info("Создаю assign-блок для wire-параметров...")
+        printable = ''
+        for param_wire in self.param_wires:
+            printable += '    assign {0} = {1};\n'.format(param_wire['name'], param_wire['value'])
+        self.template = self.template.format(**SafeDict({'assign': printable}))
